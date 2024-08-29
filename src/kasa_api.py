@@ -21,12 +21,15 @@ class KasaAPI:
         Discover Kasa devices on the network using the Discover class.
         Filters out devices that do not have emeter functionality.
         """
-        discovery_timeout = Config.KASA_COLLECTOR_DISCOVERY_TIMEOUT
-        discovery_packets = Config.KASA_COLLECTOR_DISCOVERY_PACKETS
-        devices = await Discover.discover(
-            discovery_timeout=discovery_timeout, discovery_packets=discovery_packets
-        )
+        username = Config.KASA_COLLECTOR_USERNAME
+        password = Config.KASA_COLLECTOR_PASSWORD
+        devices = await Discover.discover(username=username,password=password)
         logger.info(f"Discovered {len(devices)} devices")
+
+        # print all devices information
+        for ip, device in devices.items():
+            await device.update()
+            print(f"Device {ip} has emeter: {device.has_emeter}: model: {device.model}")
         return {ip: device for ip, device in devices.items() if device.has_emeter}
 
     @staticmethod
