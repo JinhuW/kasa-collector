@@ -1,4 +1,5 @@
 import asyncio
+import re
 from kasa import Discover, SmartStrip
 import socket
 import logging
@@ -21,16 +22,31 @@ class KasaAPI:
         Discover Kasa devices on the network using the Discover class.
         Filters out devices that do not have emeter functionality.
         """
-        username = Config.KASA_COLLECTOR_USERNAME
-        password = Config.KASA_COLLECTOR_PASSWORD
-        devices = await Discover.discover(username=username,password=password)
-        logger.info(f"Discovered {len(devices)} devices")
+        discovery_timeout = Config.KASA_COLLECTOR_DISCOVERY_TIMEOUT
+        discovery_packets = Config.KASA_COLLECTOR_DISCOVERY_PACKETS
+        username = Config.KASA_COLLECTOR_TPLINK_USERNAME
+        password = Config.KASA_COLLECTOR_TPLINK_PASSWORD
+        use_credentials = Config.KASA_COLLECTOR_USE_CREDENTIALS
+        hosts = re.split(r',\s*', Config.KASA_COLLECTOR_DEVICE_HOSTS.strip())
 
-        # print all devices information
-        for ip, device in devices.items():
-            await device.update()
-            print(f"Device {ip} has emeter: {device.has_emeter}: model: {device.model}")
-        return {ip: device for ip, device in devices.items() if device.has_emeter}
+        if Config.KASA_COLLECTOR_DEVICE_DISCOVERY:
+            devices = await Discover.discover(
+                discovery_timeout=discovery_timeout,
+                discovery_packets=discovery_packets,
+                username=username if use_credentials else None,
+                password=password if use_credentials else None
+            )
+            logger.info(f"User: {username}")
+            logger.info(f"Password: {password}")
+            logger.info(f"Discovered {len(devices)} devices")
+            return {ip: device for ip, device in devices.items() if device.has_emeter}
+        else:
+            devices = {}
+            for host in hosts:
+                device = await Discover.discover_single(host, username=username if use_credentials else None, password=password if use_credentials else None)
+                devices[host] = device
+            logger.info(f"Found {len(devices)} devices from Host List")
+            return {ip: device for ip, device in devices.items()}
 
     @staticmethod
     async def fetch_emeter_data(device):

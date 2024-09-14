@@ -1,0 +1,16 @@
+version: '3.3'
+
+services:
+  kasa-collector:
+    container_name: kasa-collector
+    environment:
+      KASA_COLLECTOR_INFLUXDB_BUCKET: kasa
+      KASA_COLLECTOR_INFLUXDB_ORG: homelab
+      KASA_COLLECTOR_INFLUXDB_TOKEN: 97c5bcf6b1d23613c4a0a0e7d5ee72cce3a9b4cd57f134a96e49949c3fc8fdbf
+      KASA_COLLECTOR_INFLUXDB_URL: http://192.168.1.100:8086
+      TZ: America/Chicago
+    build:
+      context: .
+      dockerfile: Dockerfile
+    network_mode: host
+    restart: always
