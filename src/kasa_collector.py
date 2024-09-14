@@ -32,7 +32,7 @@ class KasaCollector:
         Discover Kasa devices on the network and store them in the devices attribute.
         """
         self.devices = await KasaAPI.discover_devices()
-        self.logger.info(f"Discovered {len(self.devices)} devices")
+        self.logger.info("Discovered %d devices", len(self.devices))
 
     async def fetch_and_store_data(self):
         """
@@ -50,16 +50,42 @@ class KasaCollector:
                     await self.storage.write_to_json(
                         data, Config.KASA_COLLECTOR_OUTPUT_DIR
                     )
-            except Exception as e:
-                self.logger.error(f"Failed to fetch data from device {ip}: {e}")
+            except Exception:
+                self.logger.exception("Failed to fetch data from device %s", ip)
 
     async def periodic_fetch(self):
         """
-        Periodically fetch and store data from all devices.
+        Periodically fetch and process emeter data from all devices.
         """
         while True:
-            await self.fetch_and_store_data()
-            await asyncio.sleep(Config.KASA_COLLECTOR_DATA_FETCH_INTERVAL)
+            start_time = datetime.now()
+            device_count = len(self.devices)
+            self.logger.info(f"Starting periodic_fetch for {device_count} devices")
+
+            await asyncio.gather(
+                *[
+                    self.fetch_and_send_emeter_data(ip, device)
+                    for ip, device in self.devices.items()
+                ]
+            )
+
+            end_time = datetime.now()
+            elapsed = (end_time - start_time).total_seconds()
+            if elapsed > Config.KASA_COLLECTOR_DATA_FETCH_INTERVAL:
+                self.logger.warning(
+                    f"Fetch operation took {format_duration(elapsed)}, which is longer than the set interval of {Config.KASA_COLLECTOR_DATA_FETCH_INTERVAL} seconds."
+                )
+
+            next_run = end_time + timedelta(
+                seconds=max(0, Config.KASA_COLLECTOR_DATA_FETCH_INTERVAL - elapsed)
+            )
+            self.logger.info(
+                f"Finished periodic_fetch for {device_count} devices. Duration: {format_duration(elapsed)}. Next run in {format_duration(Config.KASA_COLLECTOR_DATA_FETCH_INTERVAL - elapsed)} at {next_run.strftime('%Y-%m-%d %H:%M:%S')}"
+            )
+
+            await asyncio.sleep(
+                max(0, Config.KASA_COLLECTOR_DATA_FETCH_INTERVAL - elapsed)
+            )
 
     async def periodic_discover(self):
         """
@@ -89,8 +115,8 @@ class KasaCollector:
             alias = device.alias
             hostname = socket.getfqdn(ip)
         except Exception as e:
-            self.logger.error(
-                f"Error retrieving alias or hostname for device {ip}: {e}"
+            self.logger.exception(
+                "Error retrieving alias or hostname for device %s", ip
             )
 
         while retries < Config.KASA_COLLECTOR_FETCH_MAX_RETRIES:
@@ -108,10 +134,13 @@ class KasaCollector:
                 retries += 1
                 await asyncio.sleep(Config.KASA_COLLECTOR_FETCH_RETRY_DELAY)
 
-            if retries == Config.KASA_COLLECTOR_FETCH_MAX_RETRIES:
-                self.logger.warning(
-                    f"Max retries reached for device {ip} (Alias: {alias}, Hostname: {hostname})"
-                )
+        if retries == Config.KASA_COLLECTOR_FETCH_MAX_RETRIES:
+            self.logger.warning(
+                "Max retries reached for device %s (Alias: %s, Hostname: %s)",
+                ip,
+                alias,
+                hostname,
+            )
 
     async def process_smart_strip_data(self, ip, smart_strip):
         """
@@ -189,43 +218,9 @@ class KasaCollector:
                 retries += 1
                 await asyncio.sleep(Config.KASA_COLLECTOR_FETCH_RETRY_DELAY)
 
-            if retries == Config.KASA_COLLECTOR_FETCH_MAX_RETRIES:
-                self.logger.warning(
-                    f"Max retries reached for device {ip} (Alias: {alias}, Hostname: {hostname})"
-                )
-
-    async def periodic_fetch(self):
-        """
-        Periodically fetch and process emeter data from all devices.
-        """
-        while True:
-            start_time = datetime.now()
-            device_count = len(self.devices)
-            self.logger.info(f"Starting periodic_fetch for {device_count} devices")
-
-            await asyncio.gather(
-                *[
-                    self.fetch_and_send_emeter_data(ip, device)
-                    for ip, device in self.devices.items()
-                ]
-            )
-
-            end_time = datetime.now()
-            elapsed = (end_time - start_time).total_seconds()
-            if elapsed > Config.KASA_COLLECTOR_DATA_FETCH_INTERVAL:
-                self.logger.warning(
-                    f"Fetch operation took {format_duration(elapsed)}, which is longer than the set interval of {Config.KASA_COLLECTOR_DATA_FETCH_INTERVAL} seconds."
-                )
-
-            next_run = end_time + timedelta(
-                seconds=max(0, Config.KASA_COLLECTOR_DATA_FETCH_INTERVAL - elapsed)
-            )
-            self.logger.info(
-                f"Finished periodic_fetch for {device_count} devices. Duration: {format_duration(elapsed)}. Next run in {format_duration(Config.KASA_COLLECTOR_DATA_FETCH_INTERVAL - elapsed)} at {next_run.strftime('%Y-%m-%d %H:%M:%S')}"
-            )
-
-            await asyncio.sleep(
-                max(0, Config.KASA_COLLECTOR_DATA_FETCH_INTERVAL - elapsed)
+        if retries == Config.KASA_COLLECTOR_FETCH_MAX_RETRIES:
+            self.logger.warning(
+                f"Max retries reached for device {ip} (Alias: {alias}, Hostname: {hostname})"
             )
 
     async def periodic_sysinfo_fetch(self):

@@ -36,6 +36,9 @@ class Config:
         os.getenv("KASA_COLLECTOR_DISCOVERY_PACKETS", "3")
     )
 
+    KASA_COLLECTOR_USERNAME = os.getenv("KASA_COLLECTOR_USERNAME")
+    KASA_COLLECTOR_PASSWORD = os.getenv("KASA_COLLECTOR_PASSWORD")
+
     # Interval in seconds between data fetch runs. Default is 15 seconds.
     KASA_COLLECTOR_DATA_FETCH_INTERVAL = int(
         os.getenv("KASA_COLLECTOR_DATA_FETCH_INTERVAL", "15")

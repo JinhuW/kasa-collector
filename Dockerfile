@@ -1,15 +1,15 @@
-# Use the official Python image as the base image
 FROM python:3.12.3-slim
 
-# Set the working directory inside the container
 WORKDIR /app/kasa_collector
 
-# Copy the requirements file and other application files into the container
-COPY requirements.txt config.py influxdb_storage.py kasa_collector.py kasa_api.py  ./
+# Copy requirements.txt from the root directory
+COPY requirements.txt .
 
-# Upgrade pip and install required packages
-RUN pip install --upgrade pip && \
-    pip install --no-cache-dir -r requirements.txt
+# Install dependencies
+RUN pip install --no-cache-dir -r requirements.txt
 
-# Run your Python script
-CMD ["python3", "./kasa_collector.py"]
+# Copy Python files from the src directory
+COPY src/config.py src/influxdb_storage.py src/kasa_collector.py src/kasa_api.py ./
+
+# Set the command to run your application
+CMD ["python", "kasa_collector.py"]

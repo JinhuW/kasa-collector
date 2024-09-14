@@ -1,0 +1,33 @@
+version: '3'
+
+services:
+  kasa-collector:
+    container_name: kasa-collector
+    build:
+      context: .
+    env_file:
+      - .env
+    network_mode: host
+    restart: always
+    depends_on:
+      - influxdb
+
+  influxdb:
+    image: influxdb:1.8
+    container_name: influxdb
+    ports:
+      - 8086
+    volumes:
+      - influxdb_data:/var/lib/influxdb
+    env_file:
+      - .env
+    environment:
+      - INFLUXDB_DB=kasa-collector
+      - INFLUXDB_ADMIN_USER=telegraf
+      - INFLUXDB_ADMIN_PASSWORD=password
+    restart: unless-stopped
+    networks:
+      - monitoring_network
+
+volumes:
+  influxdb-data:
